@@ -5,7 +5,7 @@ services:
     # only from inside the penielgo-net Docker network. See docs/architecture.md for why
     # `expose:` below does not itself enforce this (omitting `ports:` does).
     ports:
-      - "7000:7000"
+      - "5002:5002"
     environment:
       PENIELGO_ENVIRONMENT: production
       PENIELGO_USER_SERVICE_URL: http://user-service:8001
