@@ -1,11 +1,11 @@
 # Deploying to a VPS (Microservices + Nginx + Docker)
 
 Deploys **Phase 2 (`backend/microservices/`)** to a VPS behind Nginx on the domain
-`peniel-go.duckdns.org`, with the API Gateway published only on `127.0.0.1:7000` (never
+`peniel-go.duckdns.org`, with the API Gateway published only on `127.0.0.1:8888` (never
 directly on the public interface — Nginx is the only thing the internet talks to).
 
 ```
-Internet ──443/80──▶ Nginx ──▶ 127.0.0.1:7000 ──▶ api-gateway container ──▶ user/itinerary/recommendation
+Internet ──443/80──▶ Nginx ──▶ 127.0.0.1:8888 ──▶ api-gateway container ──▶ user/itinerary/recommendation
                        │
                        └──▶ frontend/dist (static files)
 ```
@@ -38,7 +38,7 @@ sudo ufw allow 'Nginx Full'   # 80 + 443
 sudo ufw enable
 ```
 
-Note there's no `ufw` rule for port 7000 — it's bound to `127.0.0.1` only (see step 3), so it
+Note there's no `ufw` rule for port 8888 — it's bound to `127.0.0.1` only (see step 3), so it
 isn't reachable from outside the box regardless.
 
 ## 2. Clone the repo
@@ -81,7 +81,7 @@ openssl rand -hex 32   # paste the output as JWT_SECRET in .env
 production overlay on top of the base `docker-compose.yml` — it does two things the dev
 compose file intentionally doesn't:
 
-- publishes the gateway as `127.0.0.1:7000:8080` instead of `8080:8080` (loopback-only, so
+- publishes the gateway as `127.0.0.1:8888:8080` instead of `8080:8080` (loopback-only, so
   Nginx is the sole path in from the internet)
 - sets `PENIELGO_CORS_ORIGINS` on all four services to `https://peniel-go.duckdns.org`
   instead of `http://localhost:5173`
@@ -91,7 +91,7 @@ Bring it up:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 docker compose ps           # all four should report healthy
-curl http://127.0.0.1:7000/health
+curl http://127.0.0.1:8888/health
 ```
 
 ## 4. Build the frontend
@@ -167,3 +167,14 @@ persist across redeploys — only `docker compose down -v` would wipe them.
   (`grep VITE_API_BASE_URL frontend/dist/assets/*.js`) and that it's `https://peniel-go.duckdns.org/api/v1`, not `localhost`.
 - **Certbot fails the HTTP-01 challenge** — DuckDNS record isn't pointing at this VPS yet, or
   port 80 isn't reachable (check `ufw status`, and that no other process holds port 80).
+- **500 Internal Server Error on page load (not from the API)** — almost always nginx
+  (`www-data`) failing to *traverse* into `/root/peniel-go/...`, which surfaces as 500 rather
+  than 403/404. Confirm with `sudo tail -30 /var/log/nginx/error.log` (look for `(13:
+  Permission denied)`) and pinpoint the exact broken permission with:
+  ```bash
+  sudo -u www-data namei -om /root/peniel-go/frontend/dist/index.html
+  ```
+  Every directory component needs at least `x` for "other"; `/root` itself needs the
+  `chmod o+x /root` from step 2. Also confirm the build actually happened —
+  `ls /root/peniel-go/frontend/dist/index.html` — since `try_files $uri /index.html;` against
+  a missing `index.html` produces the same generic 500 (an internal redirection cycle).
