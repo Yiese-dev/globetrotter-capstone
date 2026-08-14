@@ -10,7 +10,7 @@
 services:
   api-gateway:
     ports:
-      - "127.0.0.1:7000:8080"
+      - "127.0.0.1:7000:7000"
     environment:
       PENIELGO_CORS_ORIGINS: '["https://peniel-go.duckdns.org"]'
 
