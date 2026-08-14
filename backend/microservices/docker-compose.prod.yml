@@ -1,0 +1,27 @@
+# Production overlay for VPS deployment. The base docker-compose.yml stays dev-oriented
+# (port 8080, localhost CORS) — this file only overrides what production needs.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# The gateway is bound to 127.0.0.1 only: nginx (running on the host) reverse-proxies
+# HTTPS traffic to it, so the service must never be reachable directly from the internet
+# on its own port.
+services:
+  api-gateway:
+    ports:
+      - "127.0.0.1:7000:8080"
+    environment:
+      PENIELGO_CORS_ORIGINS: '["https://peniel-go.duckdns.org"]'
+
+  user-service:
+    environment:
+      PENIELGO_CORS_ORIGINS: '["https://peniel-go.duckdns.org"]'
+
+  itinerary-service:
+    environment:
+      PENIELGO_CORS_ORIGINS: '["https://peniel-go.duckdns.org"]'
+
+  recommendation-service:
+    environment:
+      PENIELGO_CORS_ORIGINS: '["https://peniel-go.duckdns.org"]'
