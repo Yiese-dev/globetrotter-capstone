@@ -1,0 +1,92 @@
+services:
+  api-gateway:
+    build: ./api-gateway
+    # The ONLY service that publishes a port to the host — every other service is reachable
+    # only from inside the penielgo-net Docker network. See docs/architecture.md for why
+    # `expose:` below does not itself enforce this (omitting `ports:` does).
+    ports:
+      - "8080:8080"
+    environment:
+      PENIELGO_ENVIRONMENT: production
+      PENIELGO_USER_SERVICE_URL: http://user-service:8001
+      PENIELGO_ITINERARY_SERVICE_URL: http://itinerary-service:8002
+      PENIELGO_RECOMMENDATION_SERVICE_URL: http://recommendation-service:8003
+      PENIELGO_CORS_ORIGINS: '["http://localhost:5173"]'
+    depends_on:
+      user-service:
+        condition: service_healthy
+      itinerary-service:
+        condition: service_healthy
+      recommendation-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - penielgo-net
+
+  user-service:
+    build: ./user-service
+    expose:
+      - "8001"
+    environment:
+      PENIELGO_ENVIRONMENT: production
+      PENIELGO_JWT_SECRET: ${JWT_SECRET}
+      PENIELGO_CORS_ORIGINS: '["http://localhost:5173"]'
+    volumes:
+      - user_data:/app/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - penielgo-net
+
+  itinerary-service:
+    build: ./itinerary-service
+    expose:
+      - "8002"
+    environment:
+      PENIELGO_ENVIRONMENT: production
+      PENIELGO_JWT_SECRET: ${JWT_SECRET}
+      PENIELGO_CORS_ORIGINS: '["http://localhost:5173"]'
+    volumes:
+      - itinerary_data:/app/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - penielgo-net
+
+  recommendation-service:
+    build: ./recommendation-service
+    expose:
+      - "8003"
+    environment:
+      PENIELGO_ENVIRONMENT: production
+      PENIELGO_JWT_SECRET: ${JWT_SECRET}
+      PENIELGO_CORS_ORIGINS: '["http://localhost:5173"]'
+      PENIELGO_USER_SERVICE_URL: http://user-service:8001
+    volumes:
+      - recommendation_data:/app/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - penielgo-net
+
+networks:
+  penielgo-net:
+    driver: bridge
+
+volumes:
+  user_data:
+  itinerary_data:
+  recommendation_data:

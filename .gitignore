@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Environment files (never commit secrets)
+.env
+.env.local
+*.env.local
+
+# Runtime JSON data (generated on first boot from */data/seed/*.seed.json, which IS tracked)
+backend/monolith/app/data/users.json
+backend/monolith/app/data/destinations.json
+backend/monolith/app/data/itineraries.json
+backend/microservices/*/app/data/*.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
