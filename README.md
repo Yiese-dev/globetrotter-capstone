@@ -1,135 +1,61 @@
-# GlobeTrotter – Travel Assistant
+# PenielGo
 
-GlobeTrotter is a **monolithic Flask application** that serves as the starting point for a semester-long capstone project.  
-Students build the monolith first, then refactor it into microservices, and finally deploy it to the cloud with resilience patterns using Docker, Kubernetes, and cloud-native tooling.
+PenielGo is a travel recommendation and itinerary web app, built as a university semester
+project to demonstrate the evolution of a system from a **monolithic architecture** to a
+**microservices architecture**.
 
----
+Users can register and log in, browse and search real travel destinations (currently seeded
+with landmarks, hotels, and restaurants around Yaoundé, Cameroon), receive personalized
+recommendations based on their preferences, build and manage multi-stop itineraries, and
+plot everything on an interactive OpenStreetMap-based map with turn-by-turn directions.
 
-## Project Structure
+## Architecture
+
+The backend is implemented **twice**, deliberately kept isolated from each other, so the
+architectural evolution can be inspected and compared directly:
+
+- **`backend/monolith/`** — Phase 1. A single FastAPI application handling auth, users,
+  destinations, recommendations, and itineraries together, with data stored in flat JSON
+  files (no database engine).
+- **`backend/microservices/`** — Phase 2. The same functionality decomposed into four
+  independently runnable services — an API Gateway, User Service, Itinerary Service, and
+  Recommendation Service — each with its own JSON data store, communicating over REST.
+  Only the API Gateway's port is ever exposed to the outside world.
+
+Both phases expose an **identical REST API contract** (`/api/v1/...`), so the React frontend
+can point at either one purely via configuration — see
+[`docs/frontend-backend-switching.md`](docs/frontend-backend-switching.md).
+
+See [`docs/architecture.md`](docs/architecture.md) for the full system design and
+[`docs/monolith-vs-microservices.md`](docs/monolith-vs-microservices.md) for a side-by-side
+comparison of the two phases.
+
+## Repository layout
 
 ```
-.
-├── app/
-│   ├── __init__.py         # Flask app factory
-│   ├── models.py           # Data models and JSON file I/O
-│   ├── auth.py             # Registration, login, JWT handling
-│   ├── destinations.py     # Destination search endpoint
-│   ├── recommendations.py  # Personalised recommendations endpoint
-│   ├── itineraries.py      # Create / list itineraries
-│   └── main.py             # App entry point
-├── data/
-│   ├── destinations.json   # Static destination catalogue (seed data)
-│   ├── users.json          # Created at runtime
-│   └── itineraries.json    # Created at runtime
-├── tests/                  # Placeholder for future tests
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-└── README.md
+PenielGo/
+├── assets/brand/        Brand assets (logo)
+├── backend/
+│   ├── monolith/         Phase 1 — single FastAPI app
+│   └── microservices/     Phase 2 — API Gateway + 3 services
+├── frontend/              React (Vite + TypeScript) web app
+└── docs/                  Architecture, API, and setup documentation
 ```
 
----
+## Getting started
 
-## REST API
+- Monolith: [`docs/setup-monolith.md`](docs/setup-monolith.md)
+- Microservices: [`docs/setup-microservices.md`](docs/setup-microservices.md)
+- API reference: [`docs/api.md`](docs/api.md)
 
-| Method | Endpoint            | Auth required | Description                              |
-|--------|---------------------|---------------|------------------------------------------|
-| POST   | `/register`         | No            | Register a new user                      |
-| POST   | `/login`            | No            | Authenticate and receive a JWT token     |
-| GET    | `/destinations`     | No            | Search the destination catalogue         |
-| GET    | `/recommendations`  | Yes (JWT)     | Get personalised recommendations        |
-| POST   | `/itineraries`      | Yes (JWT)     | Create a new itinerary                   |
-| GET    | `/itineraries`      | Yes (JWT)     | List all itineraries for the logged-in user |
+## Status
 
-Protected routes expect the header:  
-`Authorization: Bearer <your-token>`
+Both phases are complete and tested. All backend services (the monolith and all four
+microservices) have passing test suites; the React frontend — auth, destination discovery,
+recommendations, itinerary management, and the OpenStreetMap-based map — has been verified
+end-to-end against both the monolith and the microservices gateway, including a failure-
+isolation check (stopping the Recommendation Service leaves itineraries and auth unaffected).
 
-### Example requests
-
-```bash
-# Register
-curl -X POST http://localhost:5000/register \
-  -H "Content-Type: application/json" \
-  -d '{"username": "alice", "password": "s3cr3t", "preferences": ["beach", "food"]}'
-
-# Login
-curl -X POST http://localhost:5000/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "alice", "password": "s3cr3t"}'
-# Save the returned token: TOKEN=<value from .token field>
-
-# Search destinations
-curl "http://localhost:5000/destinations?tag=beach&max_cost=100"
-
-# Personalised recommendations
-curl http://localhost:5000/recommendations \
-  -H "Authorization: Bearer $TOKEN"
-
-# Create an itinerary
-curl -X POST http://localhost:5000/itineraries \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"title": "Beach Escape", "destinations": ["Bali"], "start_date": "2025-07-01", "end_date": "2025-07-14"}'
-
-# List itineraries
-curl http://localhost:5000/itineraries \
-  -H "Authorization: Bearer $TOKEN"
-```
-
----
-
-## Running Locally
-
-### Prerequisites
-- Python 3.9+
-- pip
-
-```bash
-# 1. Install dependencies
-pip install -r requirements.txt
-
-# 2. Start the server
-python app/main.py
-```
-
-The API will be available at `http://localhost:5000`.
-
----
-
-## Running with Docker
-
-```bash
-# Build and start
-docker-compose up --build
-
-# Stop
-docker-compose down
-```
-
-The `data/` directory is mounted into the container, so JSON files persist between runs.
-
----
-
-## Data Storage
-
-All data is persisted in plain JSON files inside the `data/` directory:
-
-| File                    | Purpose                              |
-|-------------------------|--------------------------------------|
-| `data/destinations.json`| Static catalogue of travel destinations (seed data) |
-| `data/users.json`       | Registered users (created at runtime) |
-| `data/itineraries.json` | User itineraries (created at runtime) |
-
-> **Note:** `data/*.json` (except `destinations.json`) are excluded from version control via `.gitignore`.
-
----
-
-## Configuration
-
-| Environment Variable | Default                              | Description           |
-|----------------------|--------------------------------------|-----------------------|
-| `SECRET_KEY`         | `globetrotter-secret-change-in-prod` | JWT signing key – **must be overridden in production** |
-| `FLASK_DEBUG`        | `0`                                  | Set to `1` to enable Flask debug mode (development only) |
-| `PORT`               | `5000`                               | Port the app listens on |
-
-> **Important:** Always set `SECRET_KEY` to a long, random value in production (e.g. `python -c "import secrets; print(secrets.token_hex(32))"`).
+`docker-compose.yml` for the microservices is written and its syntax validated
+(`docker compose config`); an actual `docker compose up --build` run needs a Docker daemon,
+which wasn't available in the environment this was built in.
